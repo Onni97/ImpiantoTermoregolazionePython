@@ -1,0 +1,107 @@
+swagger: '2.0'
+info:
+  version: '1.0'
+  title: "Api-termoregolazione"
+  description: Api per la comunicazinone tra raspberry e server
+  license:
+    name: MIT
+    url: https://github.com/Onni97/ImpiantoTermoregolazione
+basePath: /
+schemes:
+- http
+consumes:
+- application/json
+produces:
+- application/json
+paths:
+  /finestra/aperta/{ID}:
+    parameters:
+    - name: "ID"
+      in: "path"
+      description: "ID della finestra"
+      required: true
+      type: "integer"
+      format: "int64"
+    post:
+      summary: "Comunico l'apertura di una finestra"
+      responses:
+        200:
+          description: "Comunicazione avvenuta con successo"
+        500:
+          description: "Errore"
+  
+  /finestra/chiusa/{ID}:
+    parameters:
+      - name: "ID"
+        in: "path"
+        description: "ID della finestra"
+        required: true
+        type: "integer"
+        format: "int64"
+    post:
+      summary: "Comunico la chiusura di una finestra"
+      responses:
+        200:
+          description: "Comunicazione avvenuta con successo"
+        500:
+          description: "Errore"
+  
+  /temperature/{ID}:
+    parameters:
+      - name: "ID"
+        in: "path"
+        description: "ID del termometro"
+        required: true
+        type: "integer"
+        format: "int64"
+    post:
+      summary: "Comunico la temperatura rilevata"
+      parameters:
+        - in: "body"
+          name: "newTemperature"
+          description: "nuova temperatura"
+          required: true
+          schema:
+            type: "integer"
+            format: "int64"
+      responses:
+        200:
+          description: "Comunicazione avvenuta con successo"
+        500:
+          description: "Errore"
+        400:
+          description: "Non viene passata la temperatura"
+  
+  
+  /pir/assente/{ID}:
+    parameters:
+      - name: "ID"
+        in: "path"
+        description: "ID del pir"
+        required: true
+        type: "integer"
+        format: "int64"
+    post:
+      summary: "Comunica l'assenza in una stanza"
+      responses:
+        200:
+          description: "Comunicazione avvenuta con successo"
+        500:
+          description: "Errore"
+  
+  
+  /pir/presente/{ID}:
+    parameters:
+      - name: "ID"
+        in: "path"
+        description: "ID del pir"
+        required: true
+        type: "integer"
+        format: "int64"
+    post:
+      summary: "Comunica la presenza in una stanza"
+      responses:
+        200:
+          description: "Comunicazione avvenuta con successo"
+        500:
+          description: "Errore"
