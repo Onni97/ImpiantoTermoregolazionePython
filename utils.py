@@ -1,4 +1,5 @@
 import mysql.connector
+import datetime
 from mysql.connector import Error, cursor
 
 HOST = "localhost"
@@ -28,7 +29,7 @@ class db(object):
         except Error as e:
             print("Error reading data from MySQL table", e)
 
-    def query(self, query: str):
+    def query(self, query: str) -> cursor:
         if self.__connection.is_connected():
             self.__cursor = self.__connection.cursor()
             self.__cursor.execute(query)
@@ -45,7 +46,7 @@ class db(object):
             return -1
 
     def closeConnection(self):
-        if (self.__connection.is_connected()):
+        if self.__connection.is_connected():
             self.__connection.close
             return
         else:
@@ -53,19 +54,86 @@ class db(object):
 ##########
 
 
-#controlla se l'ufficio passato ha almeno una finestra aperta
-def checkIfOfficeHasAnOpenedWindows(IDOffice: int):
-    return
 
 
 #controlla se la finestra passata è aperta
-def checkIfWindowIsOpen(IDWindow: int):
+def checkIfWindowIsOpen(IDWindow: int) -> bool:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select isOpen from finestre where ID = " + str(IDWindow))
     isOpen = result[0][0]
 
     database.closeCursor()
+    database.closeConnection()
     if isOpen:
         return True
     else:
         return False
+
+
+
+#controlla se l'ufficio passato ha almeno una finestra aperta
+def checkIfOfficeHasOpenedWindows(IDOffice: int) -> bool:
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select isOpen from finestre where IDUfficio = " + str(IDOffice))
+
+    hasOpenedWindows = False
+    for window in result:
+        hasOpenedWindows = hasOpenedWindows or window[0]
+
+    database.closeCursor()
+    database.closeConnection()
+    return hasOpenedWindows
+
+
+
+#controlla se il condizionatore passato è acceso
+def checkIfConditionerIsOn(IDConditioner: int) -> bool:
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select isOn from tagliacorrente where ID = " + str(IDConditioner))
+    isOn = result[0][0]
+
+    database.closeCursor()
+    database.closeConnection()
+    return isOn
+
+
+
+#controlla se un ufficio ha condizionatori accesi
+def checkIfOfficeHasConditionersOn(IDOffice: int) -> bool:
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select isOn from tagliacorrente where IDUfficio = " + str(IDOffice))
+
+    hasConditionersOn = False
+    for conditioner in result:
+        hasConditionersOn = hasConditionersOn or conditioner[0]
+
+    database.closeCursor()
+    database.closeConnection()
+    return hasConditionersOn
+
+
+
+#restituisce l'ora dell'ultima presenza nell'ufficio passato
+def lastPresenceInOffice(IDOffice: int) -> datetime.timedelta:
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select max(lastPresenceTime) " +
+                            "from sensoridimovimento " +
+                            "where IDUfficio = " + str(IDOffice) + " " +
+                            "group by IDUfficio")
+    lastPresence = result[0][0]
+
+    database.closeCursor()
+    database.closeConnection()
+    return lastPresence
+
+
+
+#restituisce la temperatura in un ufficio
+def temperatureInOffice(IDOffice: int):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select ultimaTemperatura from uffici where ID = " + str(IDOffice))
+    temperature = result[0][0]
+
+    database.closeCursor()
+    database.closeConnection()
+    return temperature
