@@ -38,5 +38,9 @@ else:
 print("🕐 ULTIMA PRESENZA NELL'UFFICIO 609: " + str(utils.lastPresenceInOffice(609)))
 
 
+#test temperatureInOffice OK
+print("🔥 TEMPERATURA NELL'UFFICIO 609: " + str(utils.temperatureInOffice(609)) + "°")
+
+
 #test
-print("🔥 TEMPERATURA NELL'UFFICIO 609: " + str(utils.temperatureInOffice(609)))
+print("🔥 TEMPERATURA PREFERITA NELL'UFFICIO 609: " + str(utils.preferredTemperatureInOffice(609)) + "°")

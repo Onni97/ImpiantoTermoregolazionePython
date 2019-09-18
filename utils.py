@@ -7,8 +7,11 @@ DATABASE = "dbtermoregolazione"
 USERNAME = "root"
 PASSWORD = ""
 
+NUMBER_OF_TEMPERATURES_TO_TAKE_FOR_PREFERRED = 30
+
 ##### DB CONNECTOR #####
 class db(object):
+    __host: str = None
     __database: str = None
     __username: str = None
     __password: str = None
@@ -17,29 +20,37 @@ class db(object):
 
     def __init__(self, host: str, database: str, username: str, password: str):
         try:
+            self.__host = host
             self.__database = database
             self.__username = username
             self.__password = password
-            self.__connection = mysql.connector.connect(host=host,
-                                                        database=database,
-                                                        user=username,
-                                                        password=password)
-            self.__cursor = None
+            self.__connection = mysql.connector.connect(host=self.__host,
+                                                        database=self.__database,
+                                                        username=self.__username,
+                                                        password=self.__password)
+            self.__connection.close()
             return
         except Error as e:
-            print("Error reading data from MySQL table", e)
+            print("Error with database", e)
 
     def query(self, query: str) -> cursor:
-        if self.__connection.is_connected():
-            self.__cursor = self.__connection.cursor()
-            self.__cursor.execute(query)
-            return self.__cursor.fetchall()
-        else:
-            return -1
+        try:
+            self.__connection = mysql.connector.connect(host=self.__host,
+                                                        database=self.__database,
+                                                        username=self.__username,
+                                                        password=self.__password)
+            if self.__connection.is_connected():
+                self.__cursor = self.__connection.cursor()
+                self.__cursor.execute(query)
+                return self.__cursor.fetchall()
+            else:
+                return -1
+        except Error as e:
+            print("Error with database", e)
 
     def closeCursor(self):
         if self.__connection.is_connected() and self.__cursor is not None:
-            self.__cursor.close;
+            self.__cursor.close()
             self.__cursor = None
             return
         else:
@@ -47,7 +58,7 @@ class db(object):
 
     def closeConnection(self):
         if self.__connection.is_connected():
-            self.__connection.close
+            self.__connection.close()
             return
         else:
             return -1
@@ -128,7 +139,7 @@ def lastPresenceInOffice(IDOffice: int) -> datetime.timedelta:
 
 
 
-#restituisce la temperatura in un ufficio
+#restituisce la temperatura nell'ufficio passato
 def temperatureInOffice(IDOffice: int):
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select ultimaTemperatura from uffici where ID = " + str(IDOffice))
@@ -137,3 +148,21 @@ def temperatureInOffice(IDOffice: int):
     database.closeCursor()
     database.closeConnection()
     return temperature
+
+
+
+#restituisce la temperatura preferita per l'ufficio passato
+def preferredTemperatureInOffice(IDOffice: int) -> float:
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select avg(temperatura) " +
+                            "from (select u.ID, t.temperatura " +
+                                  "from temperaturesalvate t, uffici u " +
+                                  "where u.Termometro = t.IDTermometro and u.ID = " + str(IDOffice) + " " +
+                                  "order by t.data_ora desc " +
+                                  "limit " + str(NUMBER_OF_TEMPERATURES_TO_TAKE_FOR_PREFERRED) +") temp " +
+                            "group by temp.ID")
+    preferredTemperature = result[0][0]
+
+    database.closeCursor()
+    database.closeConnection()
+    return preferredTemperature
