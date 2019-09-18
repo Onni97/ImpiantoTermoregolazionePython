@@ -14,6 +14,8 @@ consumes:
 produces:
 - application/json
 paths:
+
+
   /finestra/aperta/{ID}:
     parameters:
     - name: "ID"
@@ -22,13 +24,14 @@ paths:
       required: true
       type: "integer"
       format: "int64"
-    post:
+    get:
       summary: "Comunico l'apertura di una finestra"
       responses:
         200:
           description: "Comunicazione avvenuta con successo"
         500:
           description: "Errore"
+  
   
   /finestra/chiusa/{ID}:
     parameters:
@@ -38,13 +41,14 @@ paths:
         required: true
         type: "integer"
         format: "int64"
-    post:
+    get:
       summary: "Comunico la chiusura di una finestra"
       responses:
         200:
           description: "Comunicazione avvenuta con successo"
         500:
           description: "Errore"
+  
   
   /temperature/{ID}:
     parameters:
@@ -54,7 +58,7 @@ paths:
         required: true
         type: "integer"
         format: "int64"
-    post:
+    get:
       summary: "Comunico la temperatura rilevata"
       parameters:
         - in: "body"
@@ -81,7 +85,7 @@ paths:
         required: true
         type: "integer"
         format: "int64"
-    post:
+    get:
       summary: "Comunica l'assenza in una stanza"
       responses:
         200:
@@ -98,7 +102,7 @@ paths:
         required: true
         type: "integer"
         format: "int64"
-    post:
+    get:
       summary: "Comunica la presenza in una stanza"
       responses:
         200:
