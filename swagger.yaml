@@ -50,7 +50,7 @@ paths:
           description: "Errore"
   
   
-  /temperature/{ID}:
+  /temperatura/{ID}:
     parameters:
       - name: "ID"
         in: "path"
