@@ -62,8 +62,7 @@ paths:
       summary: "Comunico la temperatura rilevata"
       parameters:
         - in: "body"
-          name: "newTemperature"
-          description: "nuova temperatura"
+          name: "temperatura"
           required: true
           schema:
             type: "integer"
