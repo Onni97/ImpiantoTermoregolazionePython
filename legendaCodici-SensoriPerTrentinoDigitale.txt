@@ -1,0 +1,6 @@
+Type of the sensor:
+1 - window
+2 - temperature
+3 - pir
+4 - conditioneer
+5 - button

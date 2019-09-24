@@ -62,17 +62,17 @@ class db(object):
             return
         else:
             return -1
-##########
+#########################
 
 
 
+##### WINDOWS FUNCTIONS #####
 
 #controlla se la finestra passata è aperta
 def checkIfWindowIsOpen(IDWindow: int) -> bool:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select isOpen from finestre where ID = " + str(IDWindow))
     isOpen = result[0][0]
-
     database.closeCursor()
     database.closeConnection()
     if isOpen:
@@ -80,49 +80,78 @@ def checkIfWindowIsOpen(IDWindow: int) -> bool:
     else:
         return False
 
-
-
 #controlla se l'ufficio passato ha almeno una finestra aperta
 def checkIfOfficeHasOpenedWindows(IDOffice: int) -> bool:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select isOpen from finestre where IDUfficio = " + str(IDOffice))
-
     hasOpenedWindows = False
     for window in result:
         hasOpenedWindows = hasOpenedWindows or window[0]
-
     database.closeCursor()
     database.closeConnection()
     return hasOpenedWindows
 
+#imposto la finestra su aperta
+def setWindowOnOpend(IDWindow):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query("update finestre set isOpen = 1 where ID = " + str(IDWindow))
+    database.closeCursor()
+    database.closeConnection()
+    return
 
+#imposto la finestra su chiusa
+def setWindowOnClosed(IDWindow):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query("update finestre set isOpen = 0 where ID = " + str(IDWindow))
+    database.closeCursor()
+    database.closeConnection()
+    return
+#########################
+
+
+
+##### CONDITIONER FUNCTINOS #####
 
 #controlla se il condizionatore passato è acceso
 def checkIfConditionerIsOn(IDConditioner: int) -> bool:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select isOn from tagliacorrente where ID = " + str(IDConditioner))
     isOn = result[0][0]
-
     database.closeCursor()
     database.closeConnection()
     return isOn
-
-
 
 #controlla se un ufficio ha condizionatori accesi
 def checkIfOfficeHasConditionersOn(IDOffice: int) -> bool:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select isOn from tagliacorrente where IDUfficio = " + str(IDOffice))
-
     hasConditionersOn = False
     for conditioner in result:
         hasConditionersOn = hasConditionersOn or conditioner[0]
-
     database.closeCursor()
     database.closeConnection()
     return hasConditionersOn
 
+#imposta il codizionatore su acceso
+def setConditionerOnOn(IDConditioner):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query("update tagliacorrente set isOn = 1 where ID = " + str(IDConditioner))
+    database.closeCursor()
+    database.closeConnection()
+    return
 
+#imposta il condizionatore su spento
+def setConditionerOnOff(IDConditioner):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query("update tagliacorrente set isOn = 0 where ID = " + str(IDConditioner))
+    database.closeCursor()
+    database.closeConnection()
+    return
+#########################
+
+
+
+##### PRESENCE FUNCTIONS #####
 
 #restituisce l'ora dell'ultima presenza nell'ufficio passato
 def lastPresenceInOffice(IDOffice: int) -> datetime.timedelta:
@@ -132,24 +161,31 @@ def lastPresenceInOffice(IDOffice: int) -> datetime.timedelta:
                             "where IDUfficio = " + str(IDOffice) + " " +
                             "group by IDUfficio")
     lastPresence = result[0][0]
-
     database.closeCursor()
     database.closeConnection()
     return lastPresence
 
+#imposta l'ora dell'ultima presenza rilevata da un PIR
+def setLastPresenceOfPIR(IDPIR: int, time: datetime):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query("update sensoridimovimento set lastPresenceTime = " + str(time) + " where ID = " + str(IDPIR))
+    database.closeCursor()
+    database.closeConnection()
+    return
+#########################
 
+
+
+##### TEMPERATURE FUNCTIONS #####
 
 #restituisce la temperatura nell'ufficio passato
 def temperatureInOffice(IDOffice: int):
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
     result = database.query("select ultimaTemperatura from uffici where ID = " + str(IDOffice))
     temperature = result[0][0]
-
     database.closeCursor()
     database.closeConnection()
     return temperature
-
-
 
 #restituisce la temperatura preferita per l'ufficio passato
 def preferredTemperatureInOffice(IDOffice: int) -> float:
@@ -162,7 +198,31 @@ def preferredTemperatureInOffice(IDOffice: int) -> float:
                                   "limit " + str(NUMBER_OF_TEMPERATURES_TO_TAKE_FOR_PREFERRED) +") temp " +
                             "group by temp.ID")
     preferredTemperature = result[0][0]
-
     database.closeCursor()
     database.closeConnection()
     return preferredTemperature
+
+#TODO: aggiungo una temperatura preferita per l'ufficio
+def addPreferredTemperature(IDOffice:int, temperature: float):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query("")
+    return
+
+#TODO: imposta la temperatura nell'ufficio
+def setTemperatureInOffice(IDOffice, temperature: float):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    database.query()
+    return
+
+#########################
+
+
+
+##### MISC #####
+
+#TODO: checkIfOfficeIsManualMode
+
+#TODO: setManualModeForOffice
+
+#TODO: setAutomaticModeForOffice
+
