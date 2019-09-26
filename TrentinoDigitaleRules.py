@@ -1,18 +1,48 @@
-import jwt
+import jwt, json, dbUtilsTrentinoDigitale
 from flask import Flask, request
+
 app = Flask(__name__)
 
 PALACE = 1
 
 
+
+
+
+
 @app.route('/values')
 def values():
-    return 500
+    data = json.loads(request.data)["data"]
+    for sensor in data:
+        sensorType = dbUtilsTrentinoDigitale.getSensorType(sensor)
+        if sensorType == 1:
+            #window
+            window(sensor, data[sensor])
 
 
 
-def finestraAperta(IDWindow=None):
-    return 500
+
+    return "", 200
+
+
+
+
+
+
+##### FINESTRE #####
+
+def window(sensor: int, data):
+    return 0
+
+
+
+def finestraAperta(idWindow, data):
+    if isinstance(data, int):
+        # viene passato solo un dato
+        return 500
+    else:
+        # vengon passati piu dati
+        return 500
 
 
 
@@ -43,4 +73,4 @@ def PIRAssente(IDPIR=None):
 
 
 if __name__ == "__main__":
-    app.run(host= '127.0.0.1', port=5001)
+    app.run(host='http://127.0.0.1')
