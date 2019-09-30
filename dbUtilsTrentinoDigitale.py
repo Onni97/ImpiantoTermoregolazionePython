@@ -1,10 +1,9 @@
 import mysql.connector
-import datetime
 from mysql.connector import Error, cursor
 
 #per i sensori
 HOST = "localhost"
-DATABASE = "dbtermoregolazione"
+DATABASE = "dbtrentinodigitalev2"
 USERNAME = "root"
 PASSWORD = ""
 
@@ -39,7 +38,7 @@ class db(object):
             self.__connection.close()
             return
         except Error as e:
-            print("Error with database", e)
+            return
 
     def query(self, query: str) -> cursor:
         try:
@@ -54,8 +53,23 @@ class db(object):
             else:
                 return -1
         except Error as e:
-            print("Error with database", e)
             return -1
+
+    def execute(self, query: str):
+        try:
+            self.__connection = mysql.connector.connect(host=self.__host,
+                                                        database=self.__database,
+                                                        username=self.__username,
+                                                        password=self.__password)
+            if self.__connection.is_connected():
+                self.__cursor = self.__connection.cursor()
+                self.__cursor.execute(query)
+                self.__connection.commit()
+            else:
+                return -1
+        except Error as e:
+            return -1
+
 
     def closeCursor(self):
         if self.__connection.is_connected() and self.__cursor is not None:
@@ -87,3 +101,23 @@ def getSensorType(sensorID: int) -> int:
     database.closeCursor()
     database.closeConnection()
     return toRtn
+
+
+
+#imposta il valore di un sensore
+def setSensorValue(sensorID: int, value: int):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+
+    return
+
+
+
+#restituisce gli ID dei raspberry collegati ad un sensore
+def getRaspberryForSensor(sensorID):
+    return
+
+
+
+#elimina l'azione dal dbTodo e restituisce sensor e value dell'azione appena eliminata
+def deleteAction(actionID):
+    return

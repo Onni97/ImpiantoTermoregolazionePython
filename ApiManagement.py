@@ -1,5 +1,5 @@
 import jwt, json, threading, requests, mysql
-from mysql.connector import Error, cursor
+from mysql.connector import Error
 from flask import Flask, request
 
 app = Flask(__name__)
@@ -14,7 +14,7 @@ PASSWORD = ""
 
 #dizionario che associa edificio al gestore
 PALACE_SERVICE = {
-    1: "http://127.0.0.1:5001/values"
+    1: "http://127.0.0.1:5001/"
 }
 
 
@@ -37,8 +37,8 @@ def getPalaceAndRaspberry(req: request) -> (str, str):
 
 
 #funzione del thread che si occupa di inviare i valori al gestore delle regole di palazzo
-def launchRequest(palace: int, raspberry:int, passedData: dict):
-    host = PALACE_SERVICE[palace]
+def launchValues(palace: int, raspberry:int, passedData: dict):
+    host = PALACE_SERVICE[palace] + "values"
     data = {"raspberry": raspberry,
             "data": passedData}
     requests.get(url=host, json=data)
@@ -59,16 +59,25 @@ def actionsForRaspberry(palace: int, raspberry: int):
             #li metto nel dizionario e li elimino dal db
             toRtn: dict = {}
             for row in results:
-                toRtn[row[1]] = row[2]
-                cur.execute("delete from actionstodo where ID = " + str(row[0]))
-                connection.commit()
+                toRtn[row[0]] = [row[1], row[2]]
 
-            print(toRtn)
             cur.close()
             connection.close()
             return toRtn
+        else:
+            return -2
     except Error:
-        return  -1
+        return -1
+
+
+
+#elimino dalle azioni da fare quella con l'id passato
+def launchDone(palace: int, raspberry:int, actionDone: int):
+    host = PALACE_SERVICE[palace] + "values"
+    data = {"raspberry": raspberry,
+            "actionDone": actionDone}
+    requests.get(url=host, json=data)
+    return
 
 
 
@@ -84,8 +93,24 @@ def values():
     if palace == -1:
         return "", 401
     else:
-        threading.Thread(target=launchRequest, args=(palace, raspberry, json.loads(request.data))).start()
+        threading.Thread(target=launchValues, args=(palace, raspberry, json.loads(request.data))).start()
         return "", 200
+
+
+
+#api per azioni prioritarie, non usa i thread
+@app.route("/priority")
+def priority():
+    palace, raspberry = getPalaceAndRaspberry(request)
+    if palace == -1:
+        return "", 401
+    else:
+        launchValues(palace, raspberry, json.loads(request.data))
+        result = actionsForRaspberry(palace, raspberry)
+        if result == 1:
+            return "", 500
+        else:
+            return result, 200
 
 
 
@@ -96,16 +121,34 @@ def ping():
     if palace == -1:
         return "", 401
     else:
-        results = actionsForRaspberry(palace, raspberry)
-        if results == -1:
+        result = actionsForRaspberry(palace, raspberry)
+        if result == -1:
             return "", 500
         else:
-            return "", 200
+            return result, 200
 
 
 
+#api per comunicare che l'azione è stata eseguita
 @app.route("/done")
-def actionDone():
+def done():
+    #elimino l'azione dalle azioni da fare
+    palace, raspberry = getPalaceAndRaspberry(request)
+    if palace == -1:
+        return "", 401
+    else:
+        if isinstance(json.loads(request.data), int):
+            threading.Thread(target=launchDone, args=(palace, raspberry, json.loads(request.data))).start()
+            return "", 200
+        else:
+            return "", 400
+
+
+
+#api per comunicare che c'è stato un problema nell'eseguire l'azione
+@app.route("/notDone")
+def NotDone():
+    #todo: gestisco la risposta nel caso non sia possibile effettuare l'azione
     return "", 500
 
 
