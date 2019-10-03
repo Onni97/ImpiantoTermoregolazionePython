@@ -1,5 +1,6 @@
-import jwt, json, threading, requests, mysql
+import jwt, json, requests, mysql, time
 from mysql.connector import Error
+from threading import Thread, Lock
 from flask import Flask, request
 
 app = Flask(__name__)
@@ -12,10 +13,15 @@ DATABASE = "todo"
 USERNAME = "root"
 PASSWORD = ""
 
+TIME_TO_WAIT_FOR_OTHER_EQUALS_REQUESTS = 0.5
+
 #dizionario che associa edificio al gestore
 PALACE_SERVICE = {
     1: "http://127.0.0.1:5001/"
 }
+
+mutex = Lock()
+sensorsInUse = []
 
 
 
@@ -37,12 +43,40 @@ def getPalaceAndRaspberry(req: request) -> (str, str):
 
 
 #funzione del thread che si occupa di inviare i valori al gestore delle regole di palazzo
+#restituisce -1 se il sensore è già in uso, altrimenti restituisce la risposta della chiamata
 def launchValues(palace: int, raspberry:int, passedData: dict):
-    host = PALACE_SERVICE[palace] + "values"
-    data = {"raspberry": raspberry,
-            "data": passedData}
-    requests.get(url=host, json=data)
-    return
+    #ottengo il sensore
+    sensor = -1
+    for k in passedData.keys():
+        sensor = k
+    if sensor == -1:
+        return -1
+    else:
+
+        mutex.acquire()
+        if (palace, sensor) in sensorsInUse:
+            #c'è già una chiamata per quel sensore, esco
+            mutex.release()
+            return -1
+        else:
+            #non c'è una chiamata per quel sensore, prendo il "posto"
+            sensorsInUse.append((palace, sensor))
+            mutex.release()
+
+            #faccio la richiesta
+            host = PALACE_SERVICE[palace] + "values"
+            data = {"raspberry": raspberry,
+                    "data": passedData}
+            toRtn = requests.get(url=host, json=data)
+
+            #aspetto un attimo per bloccare eventuali altri thread che voglion dire la mia stessa cosa
+            time.sleep(TIME_TO_WAIT_FOR_OTHER_EQUALS_REQUESTS)
+            #rilascio il posto
+            mutex.acquire()
+            sensorsInUse.remove((palace, sensor))
+            mutex.release()
+        return toRtn
+
 
 
 
@@ -56,7 +90,7 @@ def actionsForRaspberry(palace: int, raspberry: int):
             cur.execute("select ID, sensor, value from actionstodo  where palace = " + str(palace) + " and raspberry = " + str(raspberry))
             results = cur.fetchall()
 
-            #li metto nel dizionario e li elimino dal db
+            #li metto nel dizionario
             toRtn: dict = {}
             for row in results:
                 toRtn[row[0]] = [row[1], row[2]]
@@ -65,7 +99,7 @@ def actionsForRaspberry(palace: int, raspberry: int):
             connection.close()
             return toRtn
         else:
-            return -2
+            return -1
     except Error:
         return -1
 
@@ -89,12 +123,17 @@ def launchDone(palace: int, raspberry:int, actionDone: int):
 #api chiamata dai raspberry per mandare i dati
 @app.route("/values")
 def values():
-    palace, raspberry = getPalaceAndRaspberry(request)
-    if palace == -1:
-        return "", 401
-    else:
-        threading.Thread(target=launchValues, args=(palace, raspberry, json.loads(request.data))).start()
-        return "", 200
+    try:
+        palace, raspberry = getPalaceAndRaspberry(request)
+        data = json.loads(request.data)
+        if palace == -1:
+            return "", 401
+        else:
+            for sensorData in data:
+                Thread(target=launchValues, args=(palace, raspberry, {sensorData: data[sensorData]})).start()
+            return "", 200
+    except json.decoder.JSONDecodeError:
+        return "Error with the passed data", 500
 
 
 
@@ -105,12 +144,17 @@ def priority():
     if palace == -1:
         return "", 401
     else:
-        launchValues(palace, raspberry, json.loads(request.data))
-        result = actionsForRaspberry(palace, raspberry)
-        if result == 1:
-            return "", 500
-        else:
-            return result, 200
+        response = launchValues(palace, raspberry, json.loads(request.data))
+        if response == 200:
+            result = actionsForRaspberry(palace, raspberry)
+            if result == -1:
+                return "Error with dbTodo", 500
+            else:
+                return result, 200
+        elif response == 400:
+            return "No sensor with ID " + str(request.data[0]), 400
+        elif response == 500:
+            return "Error with dbTrentinoDigitale"
 
 
 
@@ -138,7 +182,7 @@ def done():
         return "", 401
     else:
         if isinstance(json.loads(request.data), int):
-            threading.Thread(target=launchDone, args=(palace, raspberry, json.loads(request.data))).start()
+            Thread(target=launchDone, args=(palace, raspberry, json.loads(request.data))).start()
             return "", 200
         else:
             return "", 400

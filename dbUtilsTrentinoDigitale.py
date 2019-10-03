@@ -1,3 +1,5 @@
+from typing import Optional, Dict, List, Any, Union
+
 import mysql.connector
 from mysql.connector import Error, cursor
 
@@ -89,15 +91,18 @@ class db(object):
 
 
 
-#restituisce il tipo del sensore passato
+#restituisce il tipo del sensore passato, -1 se c'è un problema con il db o -2 se non c'è un'entry nel db con quel sensorID
 def getSensorType(sensorID: int) -> int:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
-    result = database.query("select type from sensors where ID = " + str(sensorID))
+    result: Union[None, list] = database.query("select type from sensors where ID = " + str(sensorID))
     toRtn: int
-    if result == -1:
+    if result == -1 or result is None:
         toRtn = -1
     else:
-        toRtn = result[0][0]
+        if len(result) == 0:
+            toRtn = -2
+        else:
+            toRtn = result[0][0]
     database.closeCursor()
     database.closeConnection()
     return toRtn

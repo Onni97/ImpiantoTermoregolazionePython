@@ -25,9 +25,10 @@ def values():
             conditioneer(sensor, data[sensor])
         elif sensorType == 5:
             button(sensor, data[sensor])
+        elif sensorType == -2:
+            return "No sensor with ID " + str(sensor), 400
         else:
-            return "", 400
-
+            return "Problem with db", 500
     return "", 200
 
 
@@ -36,6 +37,10 @@ def values():
 @app.route("/done")
 def done():
     return "", 500
+
+
+
+#il raspberry comunica l'azione che non è stato possibile effettuare
 
 
 
@@ -48,28 +53,36 @@ def window(sensorID: int, data):
     if isinstance(data, int):
         # viene passato solo un dato
         print("Data of window " + str(sensorID) + ": " + str(data))
-        return "", 500
+        if data == 1:
+            #la finestra è aperta
+            windowOpen(sensorID)
+        else:
+            #la finestra è chiusa
+            windowClosed(sensorID)
+        return "", 200
     else:
         # vengon passati piu dati
         print("Data of window " + str(sensorID) + ": " + str(data))
         if data[len(data) - 1]:
             #la finestra è aperta
-            print("La finestra è aperta")
             windowOpen(sensorID)
-        return "", 500
+        else:
+            #la finestra è chiusa
+            windowClosed(sensorID)
+        return "", 200
 
 
 
 #la finestra viene cihusa
 def windowClosed(sensorID: int):
-
+    print("    Aggiorno il db, la finestra " + str(sensorID) + " è chiusa")
     return
 
 
 
 #la finestra viene aperta
 def windowOpen(sensorID: int):
-
+    print("    Aggiorno il db, la finestra " + str(sensorID) + " è aperta")
     return
 
 
