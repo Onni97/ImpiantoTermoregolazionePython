@@ -5,7 +5,8 @@ app = Flask(__name__)
 
 PALACE = 1
 
-
+#todo: thread che vede l'inattività dei sensori
+#todo: thread che guarda gli uffici quando sono vuoti da 20 minuti
 
 
 
@@ -36,7 +37,12 @@ def values():
 #il raspberry comunica l'azione avvenuta con successo
 @app.route("/done")
 def done():
-    return "", 500
+    data = json.loads(request.data)
+    result = dbUtilsTrentinoDigitale.actionDone(data.action, data.raspberry)
+    if result == -1:
+        return "", 500
+    else:
+        return "", 200
 
 
 
@@ -50,26 +56,19 @@ def done():
 ##### FINESTRE #####
 
 def window(sensorID: int, data):
+    print("Data of window " + str(sensorID) + ": " + str(data))
+    windowStatus: int
     if isinstance(data, int):
-        # viene passato solo un dato
-        print("Data of window " + str(sensorID) + ": " + str(data))
-        if data == 1:
-            #la finestra è aperta
-            windowOpen(sensorID)
-        else:
-            #la finestra è chiusa
-            windowClosed(sensorID)
-        return "", 200
+        windowStatus = data
     else:
-        # vengon passati piu dati
-        print("Data of window " + str(sensorID) + ": " + str(data))
-        if data[len(data) - 1]:
-            #la finestra è aperta
-            windowOpen(sensorID)
-        else:
-            #la finestra è chiusa
-            windowClosed(sensorID)
-        return "", 200
+        windowStatus = data[len(data) - 1]
+
+    if windowStatus:
+        windowOpen(sensorID)
+    else:
+        windowClosed(sensorID)
+
+    return 200
 
 
 
@@ -93,7 +92,13 @@ def windowOpen(sensorID: int):
 ##### TEMPERATURA #####
 
 def temperature(sensorID: int, data):
-    print(str(sensorID) + ": " + str(data))
+    print("Data of thermometer " + str(sensorID) + ": " + str(data))
+    if isinstance(data, int):
+        #viene passato un solo dato
+        print()
+    else:
+        #vengono passati più dati
+        print()
     return "", 500
 
 

@@ -1,4 +1,5 @@
 import jwt, json, requests, mysql, time
+from datetime import datetime
 from mysql.connector import Error
 from threading import Thread, Lock
 from flask import Flask, request
@@ -20,7 +21,8 @@ PALACE_SERVICE = {
     1: "http://127.0.0.1:5001/"
 }
 
-mutex = Lock()
+mutexCalls = Lock()
+mutexDone = Lock()
 sensorsInUse = []
 
 
@@ -52,16 +54,15 @@ def launchValues(palace: int, raspberry:int, passedData: dict):
     if sensor == -1:
         return -1
     else:
-
-        mutex.acquire()
+        mutexCalls.acquire()
         if (palace, sensor) in sensorsInUse:
             #c'è già una chiamata per quel sensore, esco
-            mutex.release()
+            mutexCalls.release()
             return -1
         else:
             #non c'è una chiamata per quel sensore, prendo il "posto"
             sensorsInUse.append((palace, sensor))
-            mutex.release()
+            mutexCalls.release()
 
             #faccio la richiesta
             host = PALACE_SERVICE[palace] + "values"
@@ -71,12 +72,11 @@ def launchValues(palace: int, raspberry:int, passedData: dict):
 
             #aspetto un attimo per bloccare eventuali altri thread che voglion dire la mia stessa cosa
             time.sleep(TIME_TO_WAIT_FOR_OTHER_EQUALS_REQUESTS)
-            #rilascio il posto
-            mutex.acquire()
+            #rilascio il posto4
+            mutexCalls.acquire()
             sensorsInUse.remove((palace, sensor))
-            mutex.release()
+            mutexCalls.release()
         return toRtn
-
 
 
 
@@ -87,7 +87,9 @@ def actionsForRaspberry(palace: int, raspberry: int):
         if connection.is_connected():
             #ottengo i risultati
             cur = connection.cursor()
-            cur.execute("select ID, sensor, value from actionstodo  where palace = " + str(palace) + " and raspberry = " + str(raspberry))
+            cur.execute("select a.ID, sensor, value "
+                        "from (select * from actionstodo where doneBy is not null) a, executors e " +
+                        "where a.ID = e.IDAction and a.palace = " + str(palace) + " and IDExecutor = " + str(raspberry))
             results = cur.fetchall()
 
             #li metto nel dizionario
@@ -95,6 +97,8 @@ def actionsForRaspberry(palace: int, raspberry: int):
             for row in results:
                 toRtn[row[0]] = [row[1], row[2]]
 
+            if toRtn == {}:
+                return -2
             cur.close()
             connection.close()
             return toRtn
@@ -105,11 +109,11 @@ def actionsForRaspberry(palace: int, raspberry: int):
 
 
 
-#elimino dalle azioni da fare quella con l'id passato
+#imposto su done l'azione avvenuta
 def launchDone(palace: int, raspberry:int, actionDone: int):
-    host = PALACE_SERVICE[palace] + "values"
+    host = PALACE_SERVICE[palace] + "done"
     data = {"raspberry": raspberry,
-            "actionDone": actionDone}
+            "action": actionDone}
     requests.get(url=host, json=data)
     return
 
@@ -144,13 +148,19 @@ def priority():
     if palace == -1:
         return "", 401
     else:
+
         response = launchValues(palace, raspberry, json.loads(request.data))
         if response == 200:
             result = actionsForRaspberry(palace, raspberry)
             if result == -1:
+                #Errore
                 return "Error with dbTodo", 500
+            elif result == -2:
+                #non ci sono anzioni da fare
+                return "No action needed", 200
             else:
                 return result, 200
+
         elif response == 400:
             return "No sensor with ID " + str(request.data[0]), 400
         elif response == 500:
@@ -168,6 +178,9 @@ def ping():
         result = actionsForRaspberry(palace, raspberry)
         if result == -1:
             return "", 500
+        elif result == -2:
+            # non ci sono anzioni da fare
+            return "No action needed", 200
         else:
             return result, 200
 

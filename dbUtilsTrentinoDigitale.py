@@ -1,7 +1,9 @@
-from typing import Optional, Dict, List, Any, Union
-
 import mysql.connector
+from datetime import datetime
+from typing import Union
 from mysql.connector import Error, cursor
+
+PALACE_ID = 1
 
 #per i sensori
 HOST = "localhost"
@@ -39,7 +41,7 @@ class db(object):
                                                         password=self.__password)
             self.__connection.close()
             return
-        except Error as e:
+        except Error:
             return
 
     def query(self, query: str) -> cursor:
@@ -54,7 +56,7 @@ class db(object):
                 return self.__cursor.fetchall()
             else:
                 return -1
-        except Error as e:
+        except Error:
             return -1
 
     def execute(self, query: str):
@@ -69,7 +71,7 @@ class db(object):
                 self.__connection.commit()
             else:
                 return -1
-        except Error as e:
+        except Error:
             return -1
 
 
@@ -94,9 +96,9 @@ class db(object):
 #restituisce il tipo del sensore passato, -1 se c'è un problema con il db o -2 se non c'è un'entry nel db con quel sensorID
 def getSensorType(sensorID: int) -> int:
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
-    result: Union[None, list] = database.query("select type from sensors where ID = " + str(sensorID))
+    result = database.query("select type from sensors where ID = " + str(sensorID))
     toRtn: int
-    if result == -1 or result is None:
+    if result == -1:
         toRtn = -1
     else:
         if len(result) == 0:
@@ -112,17 +114,55 @@ def getSensorType(sensorID: int) -> int:
 #imposta il valore di un sensore
 def setSensorValue(sensorID: int, value: int):
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
-
-    return
+    result = database.execute("update sensors set value = " + str(value) + " where ID = " + str(sensorID))
+    database.closeCursor()
+    database.closeConnection()
+    if result == -1:
+        return -1
+    else:
+        return 0
 
 
 
 #restituisce gli ID dei raspberry collegati ad un sensore
-def getRaspberryForSensor(sensorID):
+def getRaspberrysForSensor(sensorID):
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select r.ID "
+                            "from raspberry r, sensors s, raspberry_sensor rs " +
+                            "where r.ID = rs.IDRaspberry and s.ID = rs.IDSensor and s.ID = " + str(sensorID) + " "
+                            "order by r.lastActivity desc")
+    toRtn: Union[int, list]
+    if result == -1:
+        toRtn = -1
+    else:
+        if len(result) == 0:
+            toRtn = -2
+        else:
+            toRtn = []
+            for row in result:
+                toRtn.append(row[0])
+    database.closeCursor()
+    database.closeConnection()
+    return toRtn
+
+
+
+#aggiunge un'azione da compiere nel dbTodo
+def addAction(raspberry, sensor, value):
+
     return
 
 
 
 #elimina l'azione dal dbTodo e restituisce sensor e value dell'azione appena eliminata
-def deleteAction(actionID):
-    return
+def actionDone(actionID: int, raspberry: int):
+    database = db(HOST_TODO, DATABASE_TODO, USERNAME_TODO, PASSWORD_TODO)
+    result = database.execute("update actionstodo "
+                    " set doneBy = " + str(raspberry) + " and dateTimeDone = " + str(datetime.now()) + " " +
+                    "where palace = " + str(PALACE_ID) + " and ID = " + str(actionID))
+    database.closeCursor()
+    database.closeConnection()
+    if result == -1:
+        return -1
+    else:
+        return 0
