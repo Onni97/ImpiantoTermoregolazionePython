@@ -88,7 +88,7 @@ def actionsForRaspberry(palace: int, raspberry: int):
             #ottengo i risultati
             cur = connection.cursor()
             cur.execute("select a.ID, sensor, value "
-                        "from (select * from actionstodo where doneBy is not null) a, executors e " +
+                        "from (select * from actionstodo where doneBy is null) a, executors e " +
                         "where a.ID = e.IDAction and a.palace = " + str(palace) + " and IDExecutor = " + str(raspberry))
             results = cur.fetchall()
 

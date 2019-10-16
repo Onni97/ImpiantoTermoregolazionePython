@@ -1,12 +1,12 @@
-import json, dbUtilsTrentinoDigitale
+import json
 from flask import Flask, request
+import dbUtils
 
 app = Flask(__name__)
 
 PALACE = 1
 
-#todo: thread che vede l'inattività dei sensori
-#todo: thread che guarda gli uffici quando sono vuoti da 20 minuti
+#todo: thread che vede l'inattività dei raspberry
 
 
 
@@ -15,7 +15,7 @@ PALACE = 1
 def values():
     data = json.loads(request.data)["data"]
     for sensor in data:
-        sensorType = dbUtilsTrentinoDigitale.getSensorType(sensor)
+        sensorType = dbUtils.getSensorType(sensor)
         if sensorType == 1:
             window(sensor, data[sensor])
         elif sensorType == 2:
@@ -38,16 +38,25 @@ def values():
 @app.route("/done")
 def done():
     data = json.loads(request.data)
-    result = dbUtilsTrentinoDigitale.actionDone(data.action, data.raspberry)
-    if result == -1:
-        return "", 500
+    if not dbUtils.actionAlreadyDone(data["action"], data["raspberry"]):
+        result = dbUtils.actionDone(data["action"], data["raspberry"])
+        if result == -1:
+            return "", 500
+        else:
+            return "", 200
     else:
         return "", 200
 
 
+@app.route("/test")
+def test():
+    print(dbUtils.addAction([1,2,3], 111, 222))
+    return "", 200
+
+
 
 #il raspberry comunica l'azione che non è stato possibile effettuare
-
+#todo
 
 
 
