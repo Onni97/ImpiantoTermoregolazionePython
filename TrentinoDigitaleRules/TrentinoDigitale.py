@@ -13,7 +13,9 @@ PALACE = 1
 
 @app.route('/values')
 def values():
+    raspberry = json.loads(request.data)["raspberry"]
     data = json.loads(request.data)["data"]
+    dbUtils.updateLastActivityRaspberry(raspberry)
     for sensor in data:
         sensorType = dbUtils.getSensorType(sensor)
         if sensorType == 1:
@@ -38,6 +40,7 @@ def values():
 @app.route("/done")
 def done():
     data = json.loads(request.data)
+    dbUtils.updateLastActivityRaspberry(data["raspberry"])
     if not dbUtils.actionAlreadyDone(data["action"], data["raspberry"]):
         result = dbUtils.actionDone(data["action"], data["raspberry"])
         if result == -1:

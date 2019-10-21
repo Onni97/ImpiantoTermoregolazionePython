@@ -88,6 +88,24 @@ def getSensorType(sensorID: int) -> int:
 
 
 
+#leggo il valore di un sensore
+def getSensorValue(sensorID: int):
+    toRtn: int
+    database = db(HOST, DATABASE, USERNAME, PASSWORD)
+    result = database.query("select value from sensors where ID = " + str(sensorID))
+    if result == -1:
+        toRtn = -1
+    else:
+        if len(result) == 0:
+             toRtn = -2
+        else:
+            toRtn = result[0][0]
+    database.closeCursor()
+    database.closeConnection()
+    return toRtn
+
+
+
 #imposta il valore di un sensore
 def setSensorValue(sensorID: int, value: int):
     database = db(HOST, DATABASE, USERNAME, PASSWORD)
@@ -124,44 +142,47 @@ def getRaspberrysForSensor(sensorID):
 
 
 
-#aggiunge un'azione da compiere nel dbTodo
+#aggiunge un'azione da compiere nel dbTodo, restituisce -2 se l'azione non avrebbe alcun effetto
 def addAction(raspberrys: Union[list, int], sensor: int, value: int):
     now = datetime.now()
     connection = pymysql.connect(host=HOST_TODO,
                                user=USERNAME_TODO,
                                password=PASSWORD_TODO,
                                db=DATABASE_TODO)
-    try:
-        #inserisco l'azione
-        with connection.cursor() as cur:
-            query = "insert into actionstodo(palace, sensor, value, dateTimeInsert) " \
-                    "values(%s, %s, %s, '%s')" \
-                    % (str(PALACE_ID), str(sensor), str(value), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
-            cur.execute(query)
-        connection.commit()
+    if getSensorValue(sensor) != value:
+        try:
+            #inserisco l'azione
+            with connection.cursor() as cur:
+                query = "insert into actionstodo(palace, sensor, value, dateTimeInsert) " \
+                        "values(%s, %s, %s, '%s')" \
+                        % (str(PALACE_ID), str(sensor), str(value), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
+                cur.execute(query)
+            connection.commit()
 
-        #ottengo l'ID dell'azione appena inserita
-        with connection.cursor() as cur:
-            query = "select ID " \
-                    "from actionstodo " \
-                    "where palace = %s and sensor = %s and dateTimeInsert = '%s'" \
-                    % (str(PALACE_ID), str(sensor), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
-            cur.execute(query)
-            result = cur.fetchall()
-            idAction = result[0][0]
+            #ottengo l'ID dell'azione appena inserita
+            with connection.cursor() as cur:
+                query = "select ID " \
+                        "from actionstodo " \
+                        "where palace = %s and sensor = %s and dateTimeInsert = '%s'" \
+                        % (str(PALACE_ID), str(sensor), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
+                cur.execute(query)
+                result = cur.fetchall()
+                idAction = result[0][0]
 
-        #inserisco tutti gli esecutori per quell'azione
-        query = "insert into executors(IDAction, IDExecutor) values "
-        for raspberry in raspberrys:
-            query += " (%s, %s)," % (str(idAction), str(raspberry))
-        query = query[:-1]
-        with connection.cursor() as cur:
-            cur.execute(query)
-        connection.commit()
+            #inserisco tutti gli esecutori per quell'azione
+            query = "insert into executors(IDAction, IDExecutor) values "
+            for raspberry in raspberrys:
+                query += " (%s, %s)," % (str(idAction), str(raspberry))
+            query = query[:-1]
+            with connection.cursor() as cur:
+                cur.execute(query)
+            connection.commit()
 
-    finally:
-        connection.close()
-        return 0
+        finally:
+            connection.close()
+            return 0
+    else:
+        return -2
 
 
 
@@ -181,10 +202,6 @@ def actionDone(actionID: int, raspberry: int):
                     % (str(raspberry), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"), str(PALACE_ID), str(actionID))
             cur.execute(query)
         connection.commit()
-
-        #aggiorno illastActivity del raspberry
-        updateLastActivityRaspberry(raspberry)
-
     finally:
         connection.close()
         return 0
@@ -192,7 +209,7 @@ def actionDone(actionID: int, raspberry: int):
 
 
 #restituisce true se l'azione è già stata effettuata
-def actionAlreadyDone(actionID: int, raspberry: int):
+def actionAlreadyDone(actionID: int, raspberry: int) -> bool:
     toRtn = False
     connection = pymysql.connect(host=HOST_TODO,
                                  user=USERNAME_TODO,
@@ -206,10 +223,6 @@ def actionAlreadyDone(actionID: int, raspberry: int):
             result = cur.fetchall()
             if result[0][0] is not None:
                 toRtn = True
-
-        # aggiorno illastActivity del raspberry
-        updateLastActivityRaspberry(raspberry)
-
     finally:
         connection.close()
     return toRtn
@@ -234,3 +247,29 @@ def updateLastActivityRaspberry(raspberry: int):
     finally:
         connection.close()
         return 0
+
+
+
+
+
+
+def checkIfOfficeHasOpenWindows(office: int) -> bool:
+    hasOpenWindows: False
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select sensors.value " \
+                    "from sensors, offices " \
+                    "where sensors.IDOffice = offices.ID and sensors.type = 1 and offices.ID = %s" \
+                    % str(office)
+            cur.execute(query)
+            result = cur.fetchall()
+            for row in result:
+                if row[0]:
+                    hasOpenWindows = True
+    finally:
+        connection.close()
+    return hasOpenWindows

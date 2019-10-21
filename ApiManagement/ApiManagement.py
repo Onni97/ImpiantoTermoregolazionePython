@@ -1,5 +1,4 @@
 import jwt, json, requests, mysql, time
-from datetime import datetime
 from mysql.connector import Error
 from threading import Thread, Lock
 from flask import Flask, request
@@ -94,8 +93,10 @@ def actionsForRaspberry(palace: int, raspberry: int):
 
             #li metto nel dizionario
             toRtn: dict = {}
+            cnt = 0
             for row in results:
-                toRtn[row[0]] = [row[1], row[2]]
+                toRtn[cnt] = {"actionID": row[0], "sensor": row[1], "value": row[2]}
+                cnt = cnt + 1
 
             if toRtn == {}:
                 return -2
