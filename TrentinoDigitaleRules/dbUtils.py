@@ -21,124 +21,98 @@ PASSWORD_TODO = ""
 
 
 
-##### DB CONNECTOR #####
-class db(object):
 
-    def __init__(self, host: str, database: str, username: str, password: str):
-        try:
-            self.__host = host
-            self.__database = database
-            self.__username = username
-            self.__password = password
-            self.__connection = mysql.connector.connect(host=self.__host,
-                                                        database=self.__database,
-                                                        username=self.__username,
-                                                        password=self.__password)
-            self.__cursor = self.__connection.cursor()
-            return
-        except Error:
-            print("Error connecting the database")
-            return
-
-    def query(self, query: str) -> mysql.connector.cursor:
-        if self.__connection.is_connected():
-            self.__cursor = self.__connection.cursor()
-            self.__cursor.execute(query)
-            self.__connection.commit()
-            return self.__cursor.fetchall()
-
-    def execute(self, query: str):
-        if self.__connection.is_connected():
-            self.__cursor = self.__connection.cursor()
-            self.__cursor = self.__connection.cursor()
-            self.__cursor.execute(query)
-            self.__connection.commit()
-            return 0
-
-
-    def closeCursor(self):
-        self.__cursor.close()
-        return 0
-
-    def closeConnection(self):
-        if self.__connection.is_connected():
-            self.__connection.close()
-            return 0
-        else:
-            return -1
-#########################
 
 
 
 #restituisce il tipo del sensore passato, -1 se c'è un problema con il db o -2 se non c'è un'entry nel db con quel sensorID
-def getSensorType(sensorID: int) -> int:
-    database = db(HOST, DATABASE, USERNAME, PASSWORD)
-    result = database.query("select type from sensors where ID = %s" % str(sensorID))
-    toRtn: int
-    if result == -1:
-        toRtn = -1
-    else:
-        if len(result) == 0:
-            toRtn = -2
-        else:
-            toRtn = result[0][0]
-    database.closeCursor()
-    database.closeConnection()
-    return toRtn
+def getSensorType(sensorID: int):
+    sensorType: int
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select type " \
+                    "from sensors " \
+                    "where ID = %i" \
+                    % sensorID
+            cur.execute(query)
+            result = cur.fetchall()
+            sensorType = result[0][0]
+        connection.commit()
+    finally:
+        connection.close()
+
+    return sensorType
 
 
 
 #leggo il valore di un sensore
 def getSensorValue(sensorID: int):
-    toRtn: int
-    database = db(HOST, DATABASE, USERNAME, PASSWORD)
-    result = database.query("select value from sensors where ID = " + str(sensorID))
-    if result == -1:
-        toRtn = -1
-    else:
-        if len(result) == 0:
-             toRtn = -2
-        else:
-            toRtn = result[0][0]
-    database.closeCursor()
-    database.closeConnection()
-    return toRtn
+    value: int
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select value " \
+                    " from sensors " \
+                    " where ID = " + str(sensorID)
+            cur.execute(query)
+            result = cur.fetchall()
+            value = result[0][0]
+        connection.commit()
+    finally:
+        connection.close()
+
+    return value
 
 
 
 #imposta il valore di un sensore
-def setSensorValue(sensorID: int, value: int):
-    database = db(HOST, DATABASE, USERNAME, PASSWORD)
-    result = database.execute("update sensors set value = " + str(value) + " where ID = " + str(sensorID))
-    database.closeCursor()
-    database.closeConnection()
-    if result == -1:
-        return -1
-    else:
-        return 0
+def setSensorValue(sensorID: int, value):
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        # aggiorno l'actiondone
+        with connection.cursor() as cur:
+            query = "update sensors set value = " + str(value) + " where ID = " + str(sensorID)
+            cur.execute(query)
+        connection.commit()
+    finally:
+        connection.close()
+    return 0
 
 
 
 #restituisce gli ID dei raspberry collegati ad un sensore
 def getRaspberrysForSensor(sensorID):
-    database = db(HOST, DATABASE, USERNAME, PASSWORD)
-    result = database.query("select r.ID "
-                            "from raspberry r, sensors s, raspberry_sensor rs " +
-                            "where r.ID = rs.IDRaspberry and s.ID = rs.IDSensor and s.ID = " + str(sensorID) + " "
-                            "order by r.lastActivity desc")
-    toRtn: Union[int, list]
-    if result == -1:
-        toRtn = -1
-    else:
-        if len(result) == 0:
-            toRtn = -2
-        else:
-            toRtn = []
+    raspberrys = []
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        # aggiorno l'actiondone
+        with connection.cursor() as cur:
+            query = "select r.ID " \
+                    " from raspberry r, sensors s, raspberry_sensor rs " \
+                    " where r.ID = rs.IDRaspberry and s.ID = rs.IDSensor and s.ID = " + str(sensorID) + " " \
+                    " order by r.lastActivity desc"
+            cur.execute(query)
+            result = cur.fetchall()
             for row in result:
-                toRtn.append(row[0])
-    database.closeCursor()
-    database.closeConnection()
-    return toRtn
+                raspberrys.append(row[0])
+        connection.commit()
+    finally:
+        connection.close()
+
+    return raspberrys
 
 
 
@@ -151,32 +125,47 @@ def addAction(raspberrys: Union[list, int], sensor: int, value: int):
                                db=DATABASE_TODO)
     if getSensorValue(sensor) != value:
         try:
-            #inserisco l'azione
+            #controllo se c'è già un'azione non svolta uguale a quella che devo inserire
+            insert = True
             with connection.cursor() as cur:
-                query = "insert into actionstodo(palace, sensor, value, dateTimeInsert) " \
-                        "values(%s, %s, %s, '%s')" \
-                        % (str(PALACE_ID), str(sensor), str(value), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
-                cur.execute(query)
-            connection.commit()
-
-            #ottengo l'ID dell'azione appena inserita
-            with connection.cursor() as cur:
-                query = "select ID " \
+                query = "select * " \
                         "from actionstodo " \
-                        "where palace = %s and sensor = %s and dateTimeInsert = '%s'" \
-                        % (str(PALACE_ID), str(sensor), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
+                        "where palace = %i and sensor = %i and value = %i and doneBy is null" \
+                        % (PALACE_ID, sensor, value)
                 cur.execute(query)
                 result = cur.fetchall()
-                idAction = result[0][0]
-
-            #inserisco tutti gli esecutori per quell'azione
-            query = "insert into executors(IDAction, IDExecutor) values "
-            for raspberry in raspberrys:
-                query += " (%s, %s)," % (str(idAction), str(raspberry))
-            query = query[:-1]
-            with connection.cursor() as cur:
-                cur.execute(query)
+                if len(result) != 0:
+                    insert = False
             connection.commit()
+
+            if insert:
+                #se non c'è inserisco l'azione
+                with connection.cursor() as cur:
+                    query = "insert into actionstodo(palace, sensor, value, dateTimeInsert) " \
+                            "values(%s, %s, %s, '%s')" \
+                            % (str(PALACE_ID), str(sensor), str(value), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
+                    cur.execute(query)
+                connection.commit()
+
+                #ottengo l'ID dell'azione appena inserita
+                with connection.cursor() as cur:
+                    query = "select ID " \
+                            "from actionstodo " \
+                            "where palace = %s and sensor = %s and dateTimeInsert = '%s'" \
+                            % (str(PALACE_ID), str(sensor), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"))
+                    cur.execute(query)
+                    result = cur.fetchall()
+                    idAction = result[0][0]
+                connection.commit()
+
+                #inserisco tutti gli esecutori per quell'azione
+                query = "insert into executors(IDAction, IDExecutor) values "
+                for raspberry in raspberrys:
+                    query += " (%s, %s)," % (str(idAction), str(raspberry))
+                query = query[:-1]
+                with connection.cursor() as cur:
+                    cur.execute(query)
+                connection.commit()
 
         finally:
             connection.close()
@@ -202,6 +191,19 @@ def actionDone(actionID: int, raspberry: int):
                     % (str(raspberry), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"), str(PALACE_ID), str(actionID))
             cur.execute(query)
         connection.commit()
+
+        #aggiorno il valore del sensore
+        with connection.cursor() as cur:
+            query = "select sensor, value " \
+                    "from actionstodo " \
+                    "where ID = %i" % actionID
+            cur.execute(query)
+            result = cur.fetchall()
+            sensor = result[0][0]
+            value = result[0][1]
+        connection.commit()
+        setSensorValue(sensor, value)
+
     finally:
         connection.close()
         return 0
@@ -209,7 +211,7 @@ def actionDone(actionID: int, raspberry: int):
 
 
 #restituisce true se l'azione è già stata effettuata
-def actionAlreadyDone(actionID: int, raspberry: int) -> bool:
+def actionAlreadyDone(actionID: int) -> bool:
     toRtn = False
     connection = pymysql.connect(host=HOST_TODO,
                                  user=USERNAME_TODO,
@@ -250,11 +252,8 @@ def updateLastActivityRaspberry(raspberry: int):
 
 
 
-
-
-
 def checkIfOfficeHasOpenWindows(office: int) -> bool:
-    hasOpenWindows: False
+    hasOpenWindows = False
     connection = pymysql.connect(host=HOST,
                                  user=USERNAME,
                                  password=PASSWORD,
@@ -270,6 +269,214 @@ def checkIfOfficeHasOpenWindows(office: int) -> bool:
             for row in result:
                 if row[0]:
                     hasOpenWindows = True
+        connection.commit()
     finally:
         connection.close()
     return hasOpenWindows
+
+
+
+def getAverageT(office: int):
+    averageT: float
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select avg(value) " \
+                    "from savedtemperatures " \
+                    "where IDOffice = %s " \
+                    "group by IDOffice" \
+                    % str(office)
+            cur.execute(query)
+            result = cur.fetchall()
+            averageT = result[0][0]
+        connection.commit()
+    finally:
+        connection.close()
+    return averageT
+
+
+
+#restituisce l'ufficio del sensore, -2 se il sensore non è in un ufficio
+def getOfficeBySensor(sensor: int):
+    office: int
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select IDOffice " \
+                    "from sensors " \
+                    "where ID = %s" \
+                    % str(sensor)
+            cur.execute(query)
+            result = cur.fetchall()
+            office = result[0][0]
+        connection.commit()
+    finally:
+        connection.close()
+
+    if office is None:
+        return -2
+    else:
+        return office
+
+
+
+#restituisce l'ultima presenza nell'ufficio
+def getLastPresenceInOffice(office: int):
+    lastPresence: float
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select max(value) " \
+                    "from sensors " \
+                    "where type = 3 and IDOffice = %s " \
+                    "group by IDOffice" \
+                    % str(office)
+            cur.execute(query)
+            result = cur.fetchall()
+            lastPresence = result[0][0]
+        connection.commit()
+    finally:
+        connection.close()
+    return lastPresence
+
+
+
+#restituice tutti i pir
+def getPirs():
+    toRtn = []
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select ID " \
+                    "from sensors " \
+                    "where type = 3"
+            cur.execute(query)
+            result = cur.fetchall()
+            for row in result:
+                toRtn.append(row[0])
+        connection.commit()
+    finally:
+        connection.close()
+    return toRtn
+
+
+
+#restituisce i condizionatori di un ufficio
+def getConditioneerOfOffice(office: int):
+    toRtn = []
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select ID " \
+                    "from sensors " \
+                    "where IDOffice = %i and type = 5" \
+                    % office
+            cur.execute(query)
+            result = cur.fetchall()
+            for row in result:
+                toRtn.append(row[0])
+        connection.commit()
+    finally:
+        connection.close()
+    return toRtn
+
+
+
+#restituisce le regole relative a un certo sensore e ufficio
+def getRuleBySensor(sensor: int):
+    rules = []
+    office = getOfficeBySensor(sensor)
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            if office == -2:
+                #il sensore non è in un ufficio
+                #per questa implementazione ipotizzo che non ci possano essere sensori senza un ufficio
+                print("SENSORE FUORI DA UN UFFICIO - FEATURE COOMING SOON")
+                return []
+                #query = "select rule, conseguence " \
+                #        "from rules " \
+                #        "where rule like '%" + str(sensor) + "%'"
+            else:
+                # il sensore è in un ufficio
+                query = "select rule, conseguence " \
+                        "from rules " \
+                        "where (rule like '%" + str(sensor) + "%') or (rule like '%" + str(office) + "%') or (rule like '%ufficioX%')"
+            cur.execute(query)
+            result = cur.fetchall()
+            for row in result:
+                rules.append([row[0], row[1]])
+        connection.commit()
+    finally:
+        connection.close()
+    return rules
+
+
+
+#restituisce tutti gli id dei raspberry
+def getRaspberrys():
+    raspberrys = []
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select ID " \
+                    "from raspberry"
+            cur.execute(query)
+            result = cur.fetchall()
+            for row in result:
+                raspberrys.append(row[0])
+        connection.commit()
+    finally:
+        connection.close()
+    return raspberrys
+
+
+
+#restituisce i raspberry inattivi da più del tempo passato (in secondi)
+def getRaspberrysWithInactivity(maxAInactivity: int):
+    raspberrys = []
+    timeZero = datetime(0,0,0,0,0,0)
+    now = datetime.now()
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select ID, lastActivity " \
+                    "from raspberry"
+            cur.execute(query)
+            result = cur.fetchall()
+            for row in result:
+                if row[1] != timeZero:
+                    #se l'inattività è impostata su timeZero vuol dire che è già stata notificata l'inattività
+                    inactivity = now - row[1]
+                    inactivity = inactivity.days * 86400 + inactivity.seconds
+                    if inactivity > maxAInactivity:
+                        raspberrys.append(row[0])
+
+        connection.commit()
+    finally:
+        connection.close()
+    return raspberrys

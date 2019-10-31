@@ -1,0 +1,30 @@
+##### SINGOLI SENSORI #####
+
+condizionatore(sensoreX)
+    restituisce True se il condizionatore passato è acceso, False altrimenti
+
+finestra(sensoreX)
+    restituisce True se la finestra passata è aperta, False altrimenti
+
+assenzaTra(sensoreX)
+    restituisce True se un sensore rileva l'assenza tra un certo intervallo (in minuti), False altrimenti
+
+
+
+
+##### UFFICI #####
+
+finestreUfficioAperte(ufficioX)
+    restituisce True se l'ufficio passato ha tutte le finestre chiuse, False altrimenti
+
+assenzaTraInUfficio(ufficioX, min, max)
+    restituisce True se in un ufficio l'assenza è tra un certo intervallo (in minuti), False altrimenti
+
+TemperaturaUfficioInRange(ufficioX, error)
+    restituisce True se la temperatura di un ufficio è nel range, False altrimenti
+
+accendiCondizionatoriUfficio(ufficioX)
+    aggiunge nelle actionstodo l'accensione dei condizionatori dell'ufficio x
+
+spegniCondizionatoriUfficio(ufficioX)
+    aggiunge nelle actionstodo lo spegnimento dei condizionatori dell'ufficio x

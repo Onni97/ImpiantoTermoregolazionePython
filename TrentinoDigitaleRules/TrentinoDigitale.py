@@ -1,12 +1,22 @@
 import json
+import time
+from _ctypes import Union
+from datetime import datetime
+from threading import Thread
 from flask import Flask, request
-import dbUtils
+import dbUtils, ruleUtils
 
 app = Flask(__name__)
 
 PALACE = 1
+SECONDS_BETWEEN_PRESENZE_CHECK = 5
 
-#todo: thread che vede l'inattività dei raspberry
+
+#email sender senderstage@gmail.com
+#email receiver receiverstage@gmail.com
+#password termoregolazione
+
+
 
 
 
@@ -17,17 +27,15 @@ def values():
     data = json.loads(request.data)["data"]
     dbUtils.updateLastActivityRaspberry(raspberry)
     for sensor in data:
-        sensorType = dbUtils.getSensorType(sensor)
+        sensorType = dbUtils.getSensorType(int(sensor))
         if sensorType == 1:
-            window(sensor, data[sensor])
+            window(int(sensor), data[sensor])
         elif sensorType == 2:
-            temperature(sensor, data[sensor])
+            temperature(int(sensor), data[sensor])
         elif sensorType == 3:
-            pir(sensor, data[sensor])
+            pir(int(sensor), data[sensor])
         elif sensorType == 4:
-            conditioneer(sensor, data[sensor])
-        elif sensorType == 5:
-            button(sensor, data[sensor])
+            button(int(sensor), data[sensor])
         elif sensorType == -2:
             return "No sensor with ID " + str(sensor), 400
         else:
@@ -41,10 +49,10 @@ def values():
 def done():
     data = json.loads(request.data)
     dbUtils.updateLastActivityRaspberry(data["raspberry"])
-    if not dbUtils.actionAlreadyDone(data["action"], data["raspberry"]):
+    if not dbUtils.actionAlreadyDone(data["action"]):
         result = dbUtils.actionDone(data["action"], data["raspberry"])
         if result == -1:
-            return "", 500
+            return "Error with db", 500
         else:
             return "", 200
     else:
@@ -65,7 +73,7 @@ def test():
 
 
 
-##### FINESTRE #####
+##### SENSORS FUNCTIONS #####
 
 def window(sensorID: int, data):
     print("Data of window " + str(sensorID) + ": " + str(data))
@@ -73,86 +81,90 @@ def window(sensorID: int, data):
     if isinstance(data, int):
         windowStatus = data
     else:
-        windowStatus = data[len(data) - 1]
+        windowStatus = data[-1]
 
-    if windowStatus:
-        windowOpen(sensorID)
-    else:
-        windowClosed(sensorID)
-
+    dbUtils.setSensorValue(sensorID, windowStatus)
+    ruleUtils.check(sensorID)
     return 200
 
 
 
-#la finestra viene cihusa
-def windowClosed(sensorID: int):
-    print("    Aggiorno il db, la finestra " + str(sensorID) + " è chiusa")
-    return
-
-
-
-#la finestra viene aperta
-def windowOpen(sensorID: int):
-    print("    Aggiorno il db, la finestra " + str(sensorID) + " è aperta")
-    return
-
-
-
-
-
-
-##### TEMPERATURA #####
-
 def temperature(sensorID: int, data):
     print("Data of thermometer " + str(sensorID) + ": " + str(data))
-    if isinstance(data, int):
+    temp: float
+    if isinstance(data, Union[float, int]):
         #viene passato un solo dato
-        print()
+        temp = data
     else:
         #vengono passati più dati
-        print()
+        temp = data[-1]
+
+    dbUtils.setSensorValue(sensorID, temp)
+    ruleUtils.check(sensorID)
     return "", 500
 
 
-
-
-
-
-##### PIR #####
 
 def pir(sensorID: int, data):
     print(str(sensorID) + ": " + str(data))
+    now = datetime.now()
+    strNow = str(now.year) + str(now.month) + str(now.day) + str(now.hour) + str(now.minute) + str(now.second)
+    now = int(strNow)
+
+    dbUtils.setSensorValue(sensorID, now)
+    ruleUtils.check(sensorID)
     return "", 500
 
 
-
-
-
-
-##### CONDIZIONATORI #####
-
-def conditioneer(sensorID: int, data):
-    print(str(sensorID) + ": " + str(data))
-    return "", 500
-
-
-
-
-
-
-##### BUTTON #####
 
 def button(sensorID: int, data):
     print(str(sensorID) + ": " + str(data))
+    dbUtils.setSensorValue(sensorID, 1)
+
+    ruleUtils.check(sensorID)
     return "", 500
 
 
 
+#threak che controlla periodicamente le assenze negli uffici
+def threadPresence():
+    while not terminate:
+        pirs = dbUtils.getPirs()
+        for pirSensor in pirs:
+            ruleUtils.check(pirSensor)
+        time.sleep(SECONDS_BETWEEN_PRESENZE_CHECK)
+
+
+
+#thread che controlla l'inattività dei raspberry
+#todo def threadInactivity():
+
+
+
+
+
+
+terminate = False
+
+thread = Thread(target=threadPresence)
+thread.setName("ThreadPresence")
+thread.deamon = True
+thread.do_run = True
+try:
+    thread.start()
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("CTRL + C")
+    terminate= True
+    thread.join()
+    exit()
 
 
 
 if __name__ == "__main__":
     app.run(host='http://127.0.0.1')
+
 
 
 

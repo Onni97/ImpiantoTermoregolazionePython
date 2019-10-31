@@ -1,5 +1,10 @@
+#per questa implementazione ipotizzo che non ci possano essere sensori senza un ufficio
+
+from datetime import datetime
 from typing import Union
 import dbUtils
+
+SEASON = "Summer"
 
 
 def shuntingYardAlgorithm(rule: str) -> Union[list, int]:
@@ -24,10 +29,8 @@ def shuntingYardAlgorithm(rule: str) -> Union[list, int]:
             while operators[-1] != "(":
                 output.append(operators.pop())
             operators.pop()
-        elif symbol == "True" or symbol == "False":
-            output.append(symbol)
         else:
-            return -1
+            output.append(symbol)
         #print("OUTPUT: " + str(output) + "\nOPERATORS: " + str(operators) + "\n\n")
     while len(operators) > 0:
         output.append(operators.pop())
@@ -37,7 +40,7 @@ def shuntingYardAlgorithm(rule: str) -> Union[list, int]:
 
 
 #restituisce true se l'espressione è verificata
-def evaluate(expression: str) -> bool:
+def evaluate(expression: str, sensoreX: int, ufficioX: int) -> bool:
     expression = shuntingYardAlgorithm(expression)
     stack = []
     expression.reverse()
@@ -56,14 +59,28 @@ def evaluate(expression: str) -> bool:
             op2 = stack.pop()
             stack.append(op1 or op2)
         else:
-            value = exec(symbol)
+            value = eval(symbol)
+            stack.append(value)
         #print("EXPRESSION: " + str(expression) + "\nSTACK: " + str(stack) + "\n\n")
-
     return stack.pop()
 
 
 
+#in base al sensore passato esegue i controlli sulle regole relative
 def check(sensor: int):
+
+    office = dbUtils.getOfficeBySensor(sensor)
+    rules = dbUtils.getRuleBySensor(sensor)
+    for rule in rules:
+        checkRule(rule, sensor, office)
+    return
+
+
+
+#controlla la singola regola
+def checkRule(rule: list, sensoreX: int, ufficioX: int):
+    if evaluate(rule[0], sensoreX, ufficioX):
+        evaluate(rule[1], sensoreX, ufficioX)
     return
 
 
@@ -72,16 +89,87 @@ def check(sensor: int):
 
 ##### FUNZIONI DELLE REGOLE #####
 
-#funzioni base per vedere i valori dei sensori, hanno più alias per la comodità dell'utente
-def getValue(sensorX: int):
-    return dbUtils.getSensorValue(sensorX)
-termometro = condizionatore = finestra = getValue
+#restituisce True se il condizionatore passato è acceso, False altrimenti
+def condizionatore(sensoreX: int):
+    if dbUtils.getSensorValue(sensoreX) == 1:
+        return True
+    else:
+        return False
+
+finestra = condizionatore
 
 
 
-#restituisce true se un sensore rileva l'assenza tra
-def absenceBetween(sensorX: int, min: int, max: int):
+#restituisce True se un sensore rileva l'assenza tra un certo intervallo (in minuti), False altrimenti
+def assenzaTra(sensoreX: int, min: int, max: int):
+    value = str(dbUtils.getSensorValue(sensoreX))
+    time = datetime(int(value[0:4]), int(value[4:6]), int(value[6:8]), int(value[8:10]), int(value[10:12]), int(value[12:14]))
+    absence = datetime.now() - time
+    absence = absence.days * 86400 + absence.seconds
 
+    if min*60 > absence > max*60:
+        return True
+    else:
+        return False
+
+
+
+#restituisce True se l'ufficio passato ha tutte le finestre chiuse, False altrimenti
+def finestreUfficioAperte(ufficioX: int):
+    return  dbUtils.checkIfOfficeHasOpenWindows(ufficioX)
+
+
+
+#restituisce True se in un ufficio l'assenza è tra un certo intervallo (in minuti), False altrimenti
+def assenzaTraInUfficio(ufficioX: int, min: int, max: int):
+    value = str(dbUtils.getLastPresenceInOffice(ufficioX))
+    time = datetime(int(value[0:4]), int(value[4:6]), int(value[6:8]), int(value[8:10]), int(value[10:12]), int(value[12:14]))
+    absence = datetime.now() - time
+    absence = absence.days * 86400 + absence.seconds
+
+    if min*60 > absence > max*60:
+        return True
+    else:
+        return False
+
+
+
+#restituisce True se la temperatura di un ufficio è nel range, False altrimenti
+def TemperaturaUfficioInRange(sensoreX: int, error: int):
+    value = dbUtils.getSensorValue(sensoreX)
+    office = dbUtils.getOfficeBySensor(sensoreX)
+    average = dbUtils.getAverageT(office)
+
+    if SEASON == "Summer":
+        if value > average+error:
+            return False
+        else:
+            return True
+    elif SEASON == "Winter":
+        if value < average-error:
+            return False
+        else:
+            return True
+    return -1
+
+
+
+#aggiunge nelle actionstodo l'accensione dei condizionatori dell'ufficio x
+def accendiCondizionatoriUfficio(ufficioX: int):
+    conditioneers = dbUtils.getConditioneerOfOffice(ufficioX)
+    for conditioneer in conditioneers:
+        raspberrys = dbUtils.getRaspberrysForSensor(conditioneer)
+        dbUtils.addAction(raspberrys, conditioneer, 1)
+    return
+
+
+
+#aggiunge nelle actionstodo lo spegnimento dei condizionatori dell'ufficio x
+def spegniCondizionatoriUfficio(ufficioX: int):
+    conditioneers = dbUtils.getConditioneerOfOffice(ufficioX)
+    for conditioneer in conditioneers:
+        raspberrys = dbUtils.getRaspberrysForSensor(conditioneer)
+        dbUtils.addAction(raspberrys, conditioneer, 1)
     return
 ##########
 
@@ -94,3 +182,5 @@ def absenceBetween(sensorX: int, min: int, max: int):
 #
 #result = evaluate(infix)
 #print("Result = " + str(result))
+
+finestreUfficioAperte(1)
