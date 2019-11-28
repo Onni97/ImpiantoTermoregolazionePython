@@ -1,0 +1,17 @@
+DA IMPLEMENTARE
+- OK - sicurezza tra apiManagemente e sistema delle regole
+- OK - issue risolta
+- OK - sicurezza sull'issue risolta
+- OK - thread di inattività per i raspberry
+- OK - sicurezza: che da un palazzo non si possa accedere alle action di un altro palazzo
+
+SVILUPPI FUTURI
+- migliorare la concorrenza sul db
+- interfaccia per scrivere le regole per ogni palazzo, per vedere le issue e visualizzare il palazzo
+- integrazione di sensori per la monitorazione dei consumi
+- integrazione con i prezzi delle materie prime per monitorare anche i costi
+- aggiornare le regole e la loro valutazione per consentire la gestione di sensori fuori dagli uffici
+- aggiornare il controllo sulle regole, in modo da controllare il minor numero di regole che possono essere influenzate dalla modifica del sensore in questione
+- aggiornare il sistema delle issue in modo che rilevi automaticamente quando un'issue è stata risolta
+- implementare un sistema per assegnare automaticamente i token
+- integrare un sistema (swagger) per aggiornare le classi in remoto

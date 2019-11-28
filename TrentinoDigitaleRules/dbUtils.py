@@ -1,5 +1,3 @@
-import mysql.connector
-from mysql.connector import Error, cursor
 from datetime import datetime
 from typing import Union
 import pymysql.cursors
@@ -79,7 +77,6 @@ def setSensorValue(sensorID: int, value):
                                  password=PASSWORD,
                                  db=DATABASE)
     try:
-        # aggiorno l'actiondone
         with connection.cursor() as cur:
             query = "update sensors set value = " + str(value) + " where ID = " + str(sensorID)
             cur.execute(query)
@@ -98,7 +95,6 @@ def getRaspberrysForSensor(sensorID):
                                  password=PASSWORD,
                                  db=DATABASE)
     try:
-        # aggiorno l'actiondone
         with connection.cursor() as cur:
             query = "select r.ID " \
                     " from raspberry r, sensors s, raspberry_sensor rs " \
@@ -113,6 +109,31 @@ def getRaspberrysForSensor(sensorID):
         connection.close()
 
     return raspberrys
+
+
+
+#restituisce l'azione dall'ID, -1 se non esiste
+def getActionSensorValueByID(actionID: int):
+    action = -1
+    connection = pymysql.connect(host=HOST_TODO,
+                               user=USERNAME_TODO,
+                               password=PASSWORD_TODO,
+                               db=DATABASE_TODO)
+    try:
+        with connection.cursor() as cur:
+            query = "select sensor, value " \
+                    "from actionstodo " \
+                    "where ID = %i" \
+                    % actionID
+            cur.execute(query)
+            result = cur.fetchall()
+            if len(result) == 1:
+                action = result[0]
+        connection.commit()
+    finally:
+        connection.close()
+    return action
+
 
 
 
@@ -175,7 +196,7 @@ def addAction(raspberrys: Union[list, int], sensor: int, value: int):
 
 
 
-#elimina l'azione dal dbTodo e restituisce sensor e value dell'azione appena eliminata
+#imposta l'azione su done
 def actionDone(actionID: int, raspberry: int):
     now = datetime.now()
     connection = pymysql.connect(host=HOST_TODO,
@@ -456,7 +477,6 @@ def getRaspberrys():
 #restituisce i raspberry inattivi da più del tempo passato (in secondi)
 def getRaspberrysWithInactivity(maxAInactivity: int):
     raspberrys = []
-    timeZero = datetime(0,0,0,0,0,0)
     now = datetime.now()
     connection = pymysql.connect(host=HOST,
                                  user=USERNAME,
@@ -469,14 +489,184 @@ def getRaspberrysWithInactivity(maxAInactivity: int):
             cur.execute(query)
             result = cur.fetchall()
             for row in result:
-                if row[1] != timeZero:
-                    #se l'inattività è impostata su timeZero vuol dire che è già stata notificata l'inattività
-                    inactivity = now - row[1]
-                    inactivity = inactivity.days * 86400 + inactivity.seconds
-                    if inactivity > maxAInactivity:
-                        raspberrys.append(row[0])
-
+                inactivity = now - row[1]
+                inactivity = inactivity.days * 86400 + inactivity.seconds
+                if inactivity > maxAInactivity:
+                    raspberrys.append(row[0])
         connection.commit()
     finally:
         connection.close()
     return raspberrys
+
+
+
+#restituisce il datetime dell'ultima attività del raspberry passato
+#restituisce -1 se non esiste il raspberry passato
+def getLastActivityRaspberry(raspberry: int):
+    toRtn = -1
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select lastActivity " \
+                    "from raspberry " \
+                    "where ID = %i" \
+                    % raspberry
+            cur.execute(query)
+            result = cur.fetchall()
+            if len(result) == 1:
+                toRtn = result[0][0]
+    finally:
+        connection.close()
+    return toRtn
+
+
+
+#aggiunge una nuova issua, restituisce -2 se esiste già una issue uguale non ancora risolta, altrimenti restituisce l'ID dell'issue appena aggiunta
+def addIssue(raspberry = None, sensor = None, value = None):
+    toRtn: int
+    if checkIssue(raspberry=raspberry, sensor=sensor, value=value) == -2:
+        #controllo se esiste già un'issue uguale non risolta
+        connection = pymysql.connect(host=HOST,
+                                     user=USERNAME,
+                                     password=PASSWORD,
+                                     db=DATABASE)
+        try:
+            #creo la stringa
+            now = datetime.now()
+
+            if raspberry is None:
+                raspberryString = "null"
+            else:
+                raspberryString = raspberry
+
+            if sensor is None:
+                sensorString = "null"
+            else:
+                sensorString = sensor
+
+            if value is None:
+                valueString = "null"
+            else:
+                valueString = value
+
+            query = "insert into issues (timeInsert, raspberry, sensor, value) " \
+                    "values('%s', %s, %s, %s) " \
+                    % (str(now), str(raspberryString), str(sensorString), str(valueString))
+            with connection.cursor() as cur:
+                cur.execute(query)
+            connection.commit()
+            issueID = checkIssue(raspberry=raspberry, sensor=sensor, value=value)
+            if issueID == -2:
+                toRtn = -1
+            else:
+                toRtn = issueID
+        finally:
+            connection.close()
+    else:
+        return -2
+    return toRtn
+
+
+
+#restituisce l'ID se esiste già un'issue con gli stessi valori e non risolta, -2 altrimenti
+def checkIssue(raspberry = None, sensor = None, value = None):
+    toRtn: int
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        #creo la query
+        if raspberry is None:
+            raspberryString = "is null"
+        else:
+            raspberryString = "= " + str(raspberry)
+
+        if sensor is None:
+            sensorString = "is null"
+        else:
+            sensorString = "= " + str(sensor)
+
+        if value is None:
+            valueString = "is null"
+        else:
+            valueString = "= " + str(value)
+
+        query = "select ID " \
+                "from issues " \
+                "where raspberry %s and sensor %s and value %s and timeSolved is null" \
+                % (raspberryString, sensorString, valueString)
+
+        with connection.cursor() as cur:
+            cur.execute(query)
+            result = cur.fetchall()
+            if len(result) == 0:
+                toRtn = -2
+            else:
+                toRtn = result[0][0]
+        connection.commit()
+    finally:
+        connection.close()
+    return toRtn
+
+
+
+#imposta l'issue su risolta
+#restituisce 0 se va tutto bene, -1 se l'issue non esiste, -2 se è già risolta
+def setIssueSolved(IDIssue):
+    alreadySolved = isIssueSolved(IDIssue)
+    if alreadySolved == -1:
+        return -1
+    elif alreadySolved == 1:
+        return -2
+    else:
+        connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+        now = datetime.now()
+        query = "update issues " \
+                "set timeSolved = '%s' " \
+                "where ID = %i" \
+                % (str(now), IDIssue)
+        try:
+            with connection.cursor() as cur:
+                cur.execute(query)
+            connection.commit()
+        finally:
+            connection.close()
+        return 0
+
+
+
+#controlla se l'issue è risolta
+#resituisce 1 se è risolta, 0 se non è risolta, -1 se l'issue non esiste
+def isIssueSolved(IDIssue):
+    toRtn: int
+    connection = pymysql.connect(host=HOST,
+                                 user=USERNAME,
+                                 password=PASSWORD,
+                                 db=DATABASE)
+    try:
+        with connection.cursor() as cur:
+            query = "select timeSolved " \
+                    "from issues " \
+                    "where ID = %i" \
+                    % IDIssue
+            cur.execute(query)
+            result = cur.fetchall()
+            if len(result) == 0:
+                toRtn = -1
+            else:
+                if result[0][0] is not None:
+                    toRtn = 1
+                else:
+                    toRtn = 0
+    finally:
+        connection.close()
+    return toRtn
+
+

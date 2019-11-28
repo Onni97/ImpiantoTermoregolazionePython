@@ -5,7 +5,7 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-TOKEN_KEY = "termoregolazione"
+TOKEN_PASSWORD = "termoregolazione"
 ALGORITHM = "HS256"
 
 HOST = "localhost"
@@ -16,8 +16,11 @@ PASSWORD = ""
 TIME_TO_WAIT_FOR_OTHER_EQUALS_REQUESTS = 0.5
 
 #dizionario che associa edificio al gestore
-PALACE_SERVICE = {
-    1: "http://127.0.0.1:5001/"
+PALACES = {
+    1: {
+        "host": "http://127.0.0.1:5001/",
+        "password": "trentinodigitale"
+    }
 }
 
 mutexCalls = Lock()
@@ -36,7 +39,7 @@ def getPalaceAndRaspberry(req: request) -> (str, str):
     try:
         auth_header = req.headers.get('Authorization', '')
         token = auth_header.replace('Bearer ', '')
-        decoded = jwt.decode(token, key=TOKEN_KEY, algorithms=ALGORITHM)
+        decoded = jwt.decode(token, key=TOKEN_PASSWORD, algorithms=ALGORITHM)
         return decoded["palace"], decoded["raspberry"]
     except (jwt.InvalidSignatureError, jwt.DecodeError):
         return -1, -1
@@ -64,10 +67,12 @@ def launchValues(palace: int, raspberry:int, passedData: dict):
             mutexCalls.release()
 
             #faccio la richiesta
-            host = PALACE_SERVICE[palace] + "values"
+            host = PALACES[palace]["host"] + "values"
             data = {"raspberry": raspberry,
                     "data": passedData}
-            toRtn = requests.get(url=host, json=data)
+            token = jwt.encode(payload={}, key=PALACES[palace]["password"], algorithm=ALGORITHM).decode('utf-8')
+            header = {'Authorization': 'Bearer ' + token}
+            toRtn = requests.get(url=host, json=data, headers=header)
 
             #aspetto un attimo per bloccare eventuali altri thread che voglion dire la mia stessa cosa
             time.sleep(TIME_TO_WAIT_FOR_OTHER_EQUALS_REQUESTS)
@@ -110,12 +115,26 @@ def actionsForRaspberry(palace: int, raspberry: int):
 
 
 
-#imposto su done l'azione avvenuta
+#effettuo la chiamata di un'azione avvenuta con successo
 def launchDone(palace: int, raspberry:int, actionDone: int):
-    host = PALACE_SERVICE[palace] + "done"
+    host = PALACES[palace]["host"] + "done"
     data = {"raspberry": raspberry,
             "action": actionDone}
-    requests.get(url=host, json=data)
+    token = jwt.encode(payload={}, key=PALACES[palace]["password"], algorithm=ALGORITHM).decode('utf-8')
+    header = {'Authorization': 'Bearer ' + token}
+    requests.get(url=host, json=data, headers=header)
+    return
+
+
+
+#effettuo la chiamata di un'azione non avvenuta con successo
+def launchNotDone(palace: int, raspberry: int, actionNotDone: int):
+    host = PALACES[palace]["host"] + "notDone"
+    data = {"raspberry": raspberry,
+            "action": actionNotDone}
+    token = jwt.encode(payload={}, key=PALACES[palace]["password"], algorithm=ALGORITHM).decode('utf-8')
+    header = {'Authorization': 'Bearer ' + token}
+    requests.get(url=host, json=data, headers=header)
     return
 
 
@@ -190,7 +209,6 @@ def ping():
 #api per comunicare che l'azione è stata eseguita
 @app.route("/done")
 def done():
-    #elimino l'azione dalle azioni da fare
     palace, raspberry = getPalaceAndRaspberry(request)
     if palace == -1:
         return "", 401
@@ -206,8 +224,15 @@ def done():
 #api per comunicare che c'è stato un problema nell'eseguire l'azione
 @app.route("/notDone")
 def NotDone():
-    #todo: gestisco la risposta nel caso non sia possibile effettuare l'azione
-    return "", 500
+    palace, raspberry = getPalaceAndRaspberry(request)
+    if palace == -1:
+        return "", 401
+    else:
+        if isinstance(json.loads(request.data), int):
+            Thread(target=launchNotDone, args=(palace, raspberry, json.loads(request.data))).start()
+            return "", 200
+        else:
+            return "", 400
 
 
 

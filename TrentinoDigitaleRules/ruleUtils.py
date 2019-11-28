@@ -182,5 +182,3 @@ def spegniCondizionatoriUfficio(ufficioX: int):
 #
 #result = evaluate(infix)
 #print("Result = " + str(result))
-
-finestreUfficioAperte(1)
