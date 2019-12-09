@@ -207,12 +207,11 @@ def actionDone(actionID: int, raspberry: int):
         #aggiorno l'actiondone
         with connection.cursor() as cur:
             query = "update actionstodo " \
-                    "set doneBy = %s and dateTimeDone = %s " \
+                    "set doneBy = %s, dateTimeDone = '%s' " \
                     "where palace = %s and ID = %s" \
                     % (str(raspberry), datetime.strftime(now, "%Y-%m-%d %H:%M:%S"), str(PALACE_ID), str(actionID))
             cur.execute(query)
         connection.commit()
-
         #aggiorno il valore del sensore
         with connection.cursor() as cur:
             query = "select sensor, value " \
@@ -224,7 +223,6 @@ def actionDone(actionID: int, raspberry: int):
             value = result[0][1]
         connection.commit()
         setSensorValue(sensor, value)
-
     finally:
         connection.close()
         return 0

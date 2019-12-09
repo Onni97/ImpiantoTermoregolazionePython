@@ -15,3 +15,4 @@ SVILUPPI FUTURI
 - aggiornare il sistema delle issue in modo che rilevi automaticamente quando un'issue è stata risolta
 - implementare un sistema per assegnare automaticamente i token
 - integrare un sistema (swagger) per aggiornare le classi in remoto
+- implementare un sistema per cui i raspberry notificano al gestore delle regole i sensori che riescono a raggiungere
